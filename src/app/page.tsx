@@ -5,7 +5,7 @@ import { useAuth } from '@/context/AuthContext';
 import Login from '@/components/Login';
 import Admin from '@/components/Admin';
 import { db } from '@/lib/firebase';
-import { doc, setDoc } from 'firebase/firestore';
+import { doc, setDoc, collection, addDoc, getDocs, updateDoc, deleteDoc, query, where } from 'firebase/firestore';
 
 interface Prayer {
   id: string;
@@ -50,16 +50,34 @@ export default function Home() {
     return () => clearTimeout(timer);
   }, []);
 
-  useEffect(() => {
-    const stored = localStorage.getItem('prayers');
-    if (stored) {
-      setPrayers(JSON.parse(stored));
+  // Load prayers from Firestore
+  const loadPrayers = async () => {
+    if (!user) return;
+    
+    try {
+      const prayersRef = collection(db, 'prayers');
+      const q = query(prayersRef, where('userId', '==', user.uid));
+      const querySnapshot = await getDocs(q);
+      
+      const loadedPrayers: Prayer[] = [];
+      querySnapshot.forEach((doc) => {
+        loadedPrayers.push({ id: doc.id, ...doc.data() } as Prayer);
+      });
+      
+      setPrayers(loadedPrayers);
+    } catch (error) {
+      console.error('Error loading prayers:', error);
     }
-  }, []);
+  };
 
+  // Load prayers when user changes
   useEffect(() => {
-    localStorage.setItem('prayers', JSON.stringify(prayers));
-  }, [prayers]);
+    if (user) {
+      loadPrayers();
+    } else {
+      setPrayers([]); // Clear prayers when user logs out
+    }
+  }, [user]);
 
   // Auto-populate email field with user's email
   useEffect(() => {
@@ -70,40 +88,63 @@ export default function Home() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    const newPrayer: Prayer = {
-      id: Date.now().toString(),
-      userId: user?.uid || 'anonymous',
-      ...form,
-    };
-    setPrayers(prev => [...prev, newPrayer]);
     
-    // Store user reminder preferences in Firestore
-    if (user && form.reminderFrequency !== 'never') {
-      try {
+    if (!user) {
+      alert('Please log in to save prayers');
+      return;
+    }
+    
+    try {
+      const newPrayerData = {
+        userId: user.uid,
+        date: form.date,
+        type: form.type,
+        text: form.text,
+        journal: form.journal,
+        email: form.email,
+        prayFor: form.prayFor,
+        reminderFrequency: form.reminderFrequency,
+        includeActiveSummary: form.includeActiveSummary,
+        archived: false,
+      };
+      
+      // Save to Firestore
+      const docRef = await addDoc(collection(db, 'prayers'), newPrayerData);
+      
+      // Add to local state with Firestore ID
+      const newPrayer: Prayer = {
+        id: docRef.id,
+        ...newPrayerData,
+      };
+      setPrayers(prev => [...prev, newPrayer]);
+      
+      // Store user reminder preferences in Firestore
+      if (form.reminderFrequency !== 'never') {
         await setDoc(doc(db, 'users', user.uid), {
           email: form.email,
           reminderFrequency: form.reminderFrequency,
           includeActiveSummary: form.includeActiveSummary,
-          lastEmailSent: null, // Will be set when first email is sent
+          lastEmailSent: null,
         }, { merge: true });
         
         console.log('✅ Reminder preferences saved');
-      } catch (error) {
-        console.error('❌ Failed to save reminder preferences:', error);
       }
+      
+      // Reset form
+      setForm({
+        date: new Date().toISOString().split('T')[0],
+        type: 'prayer',
+        text: '',
+        journal: '',
+        email: user.email || '',
+        prayFor: '',
+        reminderFrequency: 'never',
+        includeActiveSummary: false,
+      });
+    } catch (error) {
+      console.error('Error saving prayer:', error);
+      alert('Failed to save prayer. Please try again.');
     }
-    
-    // Reset form
-    setForm({
-      date: new Date().toISOString().split('T')[0],
-      type: 'prayer',
-      text: '',
-      journal: '',
-      email: user?.email || '',
-      prayFor: '',
-      reminderFrequency: 'never',
-      includeActiveSummary: false,
-    });
   };
 
   const activePrayers = prayers.filter(prayer => !prayer.archived);
@@ -204,6 +245,23 @@ export default function Home() {
       } catch (clipboardErr) {
         alert('Prayer copied to clipboard!');
       }
+    }
+  };
+
+  // Archive/unarchive prayers in Firestore
+  const toggleArchivePrayer = async (prayerId: string, archived: boolean) => {
+    try {
+      await updateDoc(doc(db, 'prayers', prayerId), {
+        archived: archived
+      });
+      
+      // Update local state
+      setPrayers(prev => prev.map(p => 
+        p.id === prayerId ? { ...p, archived: archived } : p
+      ));
+    } catch (error) {
+      console.error('Error updating prayer archive status:', error);
+      alert('Failed to update prayer. Please try again.');
     }
   };
 
@@ -451,11 +509,7 @@ export default function Home() {
                     <div className="flex justify-end mt-3 pt-2 border-t border-gray-600">
                       {prayer.archived ? (
                         <button
-                          onClick={() => {
-                            setPrayers(prev => prev.map(p => 
-                              p.id === prayer.id ? { ...p, archived: false } : p
-                            ));
-                          }}
+                          onClick={() => toggleArchivePrayer(prayer.id, false)}
                           className="px-3 py-1 text-green-500 hover:text-green-400 text-sm font-medium hover:bg-gray-700 rounded transition-colors"
                           title="Restore prayer"
                         >
@@ -463,11 +517,7 @@ export default function Home() {
                         </button>
                       ) : (
                         <button
-                          onClick={() => {
-                            setPrayers(prev => prev.map(p => 
-                              p.id === prayer.id ? { ...p, archived: true } : p
-                            ));
-                          }}
+                          onClick={() => toggleArchivePrayer(prayer.id, true)}
                           className="px-3 py-1 text-red-500 hover:text-red-400 text-sm font-medium hover:bg-gray-700 rounded transition-colors"
                           title="Archive prayer"
                         >
