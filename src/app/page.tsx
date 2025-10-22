@@ -4,9 +4,12 @@ import { useState, useEffect } from 'react';
 import { useAuth } from '@/context/AuthContext';
 import Login from '@/components/Login';
 import Admin from '@/components/Admin';
+import { db } from '@/lib/firebase';
+import { doc, setDoc } from 'firebase/firestore';
 
 interface Prayer {
   id: string;
+  userId?: string;
   date: string;
   type: 'prayer' | 'praise';
   text: string;
@@ -69,49 +72,28 @@ export default function Home() {
     e.preventDefault();
     const newPrayer: Prayer = {
       id: Date.now().toString(),
+      userId: user?.uid || 'anonymous',
       ...form,
     };
     setPrayers(prev => [...prev, newPrayer]);
     
-    if (form.email && form.reminderFrequency !== 'never') {
+    // Store user reminder preferences in Firestore
+    if (user && form.reminderFrequency !== 'never') {
       try {
-        let message = `Date: ${form.date}\n\n${form.text}\n\nJournal: ${form.journal || 'None'}`;
+        await setDoc(doc(db, 'users', user.uid), {
+          email: form.email,
+          reminderFrequency: form.reminderFrequency,
+          includeActiveSummary: form.includeActiveSummary,
+          lastEmailSent: null, // Will be set when first email is sent
+        }, { merge: true });
         
-        if (form.prayFor) {
-          message += `\n\nPraying for: ${form.prayFor}`;
-        }
-        
-        if (form.includeActiveSummary) {
-          const activePrayers = prayers.filter(prayer => !prayer.archived);
-          if (activePrayers.length > 0) {
-            message += `\n\n--- Active Prayers Summary ---\n`;
-            activePrayers.forEach(prayer => {
-              message += `\n${prayer.date} - ${prayer.type.toUpperCase()}: ${prayer.text}`;
-              if (prayer.prayFor) {
-                message += ` (Praying for: ${prayer.prayFor})`;
-              }
-              if (prayer.journal) {
-                message += `\n  Journal: ${prayer.journal}`;
-              }
-              message += `\n`;
-            });
-          }
-        }
-        
-        await fetch('/api/send-email', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            email: form.email,
-            subject: `New ${form.type} added - ${form.reminderFrequency} reminders enabled`,
-            message: message,
-          }),
-        });
+        console.log('✅ Reminder preferences saved');
       } catch (error) {
-        console.error('Failed to send email:', error);
+        console.error('❌ Failed to save reminder preferences:', error);
       }
     }
     
+    // Reset form
     setForm({
       date: new Date().toISOString().split('T')[0],
       type: 'prayer',

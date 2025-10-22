@@ -11,6 +11,16 @@ service cloud.firestore {
       allow read, write: if request.auth != null;
     }
 
+    // Allow server-side API access for scheduled emails (no auth required for GET)
+    match /prayers {
+      allow read: if true;
+    }
+
+    // Allow server-side API access for scheduled emails
+    match /users {
+      allow read: if true;
+    }
+
     // Allow authenticated users to read/write config (for admin settings)
     match /config/{configId} {
       allow read, write: if request.auth != null;

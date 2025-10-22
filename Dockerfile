@@ -33,6 +33,12 @@ ENV NEXT_TELEMETRY_DISABLED=1
 RUN addgroup --system --gid 1001 nodejs
 RUN adduser --system --uid 1001 nextjs
 
+# Install cron and curl for scheduled tasks
+RUN apk add --no-cache dcron curl
+
+# Create cron log directory
+RUN mkdir -p /var/log/cron && chown nextjs:nodejs /var/log/cron
+
 COPY --from=builder /app/public ./public
 
 # Set the correct permission for prerender cache
@@ -52,6 +58,18 @@ ENV PORT=3000
 # set hostname to localhost
 ENV HOSTNAME="0.0.0.0"
 
+# Create cron jobs for scheduled emails
+RUN echo "*/5 * * * * curl -s http://localhost:3000/api/send-scheduled-emails >> /var/log/cron/scheduled-emails.log 2>&1" > /etc/crontabs/nextjs
+
+# Make sure cron files have correct permissions
+RUN chown nextjs:nodejs /etc/crontabs/nextjs
+
+# Create startup script
+RUN echo '#!/bin/sh' > /app/start.sh && \
+    echo 'crond -f -l 8 &' >> /app/start.sh && \
+    echo 'exec "$@"' >> /app/start.sh && \
+    chmod +x /app/start.sh
+
 # server.js is created by next build from the standalone output
 # https://nextjs.org/docs/pages/api-reference/next-config-js/output
-CMD ["node", "server.js"]
+CMD ["/app/start.sh", "node", "server.js"]
