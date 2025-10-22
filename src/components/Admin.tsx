@@ -64,14 +64,42 @@ export default function Admin() {
   };
 
   const saveConfig = async () => {
+    // Validate required fields
+    if (!config.host.trim()) {
+      setMessage('SMTP host is required.');
+      return;
+    }
+    if (!config.user.trim()) {
+      setMessage('SMTP username is required.');
+      return;
+    }
+    if (!config.pass.trim()) {
+      setMessage('SMTP password is required.');
+      return;
+    }
+    if (!config.from.trim()) {
+      setMessage('From email is required.');
+      return;
+    }
+    if (isNaN(config.port) || config.port < 1 || config.port > 65535) {
+      setMessage('Port must be a valid number between 1 and 65535.');
+      return;
+    }
+
     setSaving(true);
     setMessage('');
     try {
       await setDoc(doc(db, 'config', 'smtp'), config);
       setMessage('SMTP configuration saved successfully!');
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error saving config:', error);
-      setMessage('Error saving configuration.');
+      if (error.code === 'permission-denied') {
+        setMessage('Permission denied. Please check your authentication and Firestore security rules.');
+      } else if (error.code === 'unavailable') {
+        setMessage('Firestore is currently unavailable. Please try again later.');
+      } else {
+        setMessage(`Error saving configuration: ${error.message || 'Unknown error'}`);
+      }
     } finally {
       setSaving(false);
     }
@@ -159,8 +187,13 @@ export default function Admin() {
             <input
               type="number"
               value={config.port}
-              onChange={(e) => setConfig(prev => ({ ...prev, port: parseInt(e.target.value) }))}
+              onChange={(e) => {
+                const value = parseInt(e.target.value);
+                setConfig(prev => ({ ...prev, port: isNaN(value) ? 587 : value }));
+              }}
               className="w-full p-2 bg-gray-700 border border-gray-600 rounded text-white"
+              min="1"
+              max="65535"
             />
           </div>
           

@@ -54,6 +54,61 @@ Admin users can access the admin panel by clicking the "Admin" button in the hea
 
 The admin panel saves settings to Firestore for persistent configuration.
 
+## Firestore Security Rules
+
+To enable SMTP configuration saving and other admin features, you need to deploy Firestore security rules:
+
+1. Install Firebase CLI if you haven't already:
+   ```bash
+   npm install -g firebase-tools
+   ```
+
+2. Login to Firebase:
+   ```bash
+   firebase login
+   ```
+
+3. Initialize or connect to your Firebase project:
+   ```bash
+   firebase use --add
+   ```
+   Select your prayer-app project.
+
+4. Deploy the security rules using the provided script:
+   ```bash
+   # On Linux/Mac
+   ./deploy-firestore-rules.sh
+   
+   # On Windows
+   deploy-firestore-rules.bat
+   ```
+   
+   Or deploy manually:
+   ```bash
+   firebase deploy --only firestore:rules
+   ```
+
+The `firestore.rules` file in this repository allows authenticated users to read/write configuration data needed for the admin panel.
+
+## SMTP Configuration
+
+After deploying Firestore rules, you can configure SMTP settings through the admin panel:
+
+1. Log in as an admin user
+2. Click the "Admin" button
+3. Fill in your SMTP provider details (Gmail, Outlook, etc.)
+4. Save the configuration
+
+**Gmail Setup:**
+- Host: `smtp.gmail.com`
+- Port: `587` (or `465` for SSL)
+- Username: Your Gmail address
+- Password: App password (not your regular password)
+- From: Your Gmail address
+- Use SSL/TLS: Checked for port 465, unchecked for port 587
+
+**Note:** For Gmail, you'll need to generate an "App Password" in your Google Account settings.
+
 ## Getting Started
 
 First, install dependencies:
