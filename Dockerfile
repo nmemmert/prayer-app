@@ -1,27 +1,20 @@
 # Use the official Node.js 18 Alpine image as the base
 FROM node:18-alpine AS base
 
-# Install dependencies only when needed
-FROM base AS deps
+# Install dependencies and build in the same stage for simplicity
+FROM base AS builder
 # Check https://github.com/nodejs/docker-node/tree/b4117f9333da4138b03a546ec926ef50a31506c3#nodealpine to understand why libc6-compat might be needed.
 RUN apk add --no-cache libc6-compat
 WORKDIR /app
 
-# Install dependencies based on the preferred package manager
+# Copy package files
 COPY package.json package-lock.json* ./
-RUN \
-  if [ -f package-lock.json ]; then npm ci --only=production; \
-  else echo "Lockfile not found." && exit 1; \
-  fi
 
-# Rebuild the source code only when needed
-FROM base AS builder
-WORKDIR /app
-COPY --from=deps /app/node_modules ./node_modules
-COPY . .
-
-# Install all dependencies (including dev dependencies) for building
+# Install all dependencies (including dev dependencies)
 RUN npm ci
+
+# Copy source code
+COPY . .
 
 # Next.js collects completely anonymous telemetry data about general usage.
 # Learn more here: https://nextjs.org/telemetry
