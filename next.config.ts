@@ -6,8 +6,8 @@ const nextConfig: NextConfig = {
   /* config options here */
 };
 
-const config = process.env.NODE_ENV === 'production' ? withPWA({
+const config = withPWA({
   dest: 'public',
-})(nextConfig) : nextConfig;
+})(nextConfig);
 
 export default config;
