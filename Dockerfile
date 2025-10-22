@@ -34,7 +34,7 @@ RUN addgroup --system --gid 1001 nodejs
 RUN adduser --system --uid 1001 nextjs
 
 # Install cron and curl for scheduled tasks
-RUN apk add --no-cache dcron curl
+RUN apk add --no-cache dcron curl su-exec
 
 # Create cron log directory
 RUN mkdir -p /var/log/cron && chown nextjs:nodejs /var/log/cron
@@ -44,12 +44,15 @@ RUN echo "*/5 * * * * curl -s http://localhost:3000/api/send-scheduled-emails >>
     chown nextjs:nodejs /etc/crontabs/nextjs && \
     chmod 600 /etc/crontabs/nextjs
 
-# Create startup script
+# Create startup script that runs cron as root and app as nextjs
 RUN echo '#!/bin/sh' > /app/start.sh && \
+    echo '# Start cron daemon as root' >> /app/start.sh && \
     echo 'crond -f -l 8 &' >> /app/start.sh && \
-    echo 'exec "$@"' >> /app/start.sh && \
-    chmod +x /app/start.sh && \
-    chown nextjs:nodejs /app/start.sh
+    echo '# Wait a moment for cron to start' >> /app/start.sh && \
+    echo 'sleep 1' >> /app/start.sh && \
+    echo '# Switch to nextjs user and start the app' >> /app/start.sh && \
+    echo 'exec su-exec nextjs:nodejs "$@"' >> /app/start.sh && \
+    chmod +x /app/start.sh
 
 COPY --from=builder /app/public ./public
 
@@ -61,8 +64,6 @@ RUN chown nextjs:nodejs .next
 # https://nextjs.org/docs/advanced-features/output-file-tracing
 COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
 COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
-
-USER nextjs
 
 EXPOSE 3000
 
