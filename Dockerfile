@@ -39,6 +39,18 @@ RUN apk add --no-cache dcron curl
 # Create cron log directory
 RUN mkdir -p /var/log/cron && chown nextjs:nodejs /var/log/cron
 
+# Create cron job file for nextjs user
+RUN echo "*/5 * * * * curl -s http://localhost:3000/api/send-scheduled-emails >> /var/log/cron/scheduled-emails.log 2>&1" > /etc/crontabs/nextjs && \
+    chown nextjs:nodejs /etc/crontabs/nextjs && \
+    chmod 600 /etc/crontabs/nextjs
+
+# Create startup script
+RUN echo '#!/bin/sh' > /app/start.sh && \
+    echo 'crond -f -l 8 &' >> /app/start.sh && \
+    echo 'exec "$@"' >> /app/start.sh && \
+    chmod +x /app/start.sh && \
+    chown nextjs:nodejs /app/start.sh
+
 COPY --from=builder /app/public ./public
 
 # Set the correct permission for prerender cache
@@ -57,18 +69,6 @@ EXPOSE 3000
 ENV PORT=3000
 # set hostname to localhost
 ENV HOSTNAME="0.0.0.0"
-
-# Create cron jobs for scheduled emails
-RUN echo "*/5 * * * * curl -s http://localhost:3000/api/send-scheduled-emails >> /var/log/cron/scheduled-emails.log 2>&1" > /etc/crontabs/nextjs
-
-# Make sure cron files have correct permissions
-RUN chown nextjs:nodejs /etc/crontabs/nextjs
-
-# Create startup script
-RUN echo '#!/bin/sh' > /app/start.sh && \
-    echo 'crond -f -l 8 &' >> /app/start.sh && \
-    echo 'exec "$@"' >> /app/start.sh && \
-    chmod +x /app/start.sh
 
 # server.js is created by next build from the standalone output
 # https://nextjs.org/docs/pages/api-reference/next-config-js/output
