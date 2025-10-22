@@ -2,17 +2,25 @@ version: '3.8'
 
 services:
   prayer-app:
-    build:
-      context: .
-      dockerfile: Dockerfile
+    image: ghcr.io/nmemmert/prayer-app:latest
+    container_name: prayer-app
+    restart: unless-stopped
     ports:
       - "3000:3000"
     environment:
       - NODE_ENV=production
-    restart: unless-stopped
+      - NEXT_PUBLIC_EMAILJS_SERVICE_ID=service_zwpcif9
+      - NEXT_PUBLIC_EMAILJS_TEMPLATE_ID=template_z50fk3e
+      - NEXT_PUBLIC_EMAILJS_PUBLIC_KEY=W6JhfYIWckVEP2nrm
+    networks:
+      - prayer-network
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:3000/api/health"]
+      test: ["CMD", "curl", "-f", "http://localhost:3000"]
       interval: 30s
       timeout: 10s
       retries: 3
       start_period: 40s
+
+networks:
+  prayer-network:
+    driver: bridge
