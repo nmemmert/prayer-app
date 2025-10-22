@@ -5,7 +5,8 @@ import { useAuth } from '@/context/AuthContext';
 import Login from '@/components/Login';
 import Admin from '@/components/Admin';
 import { db } from '@/lib/firebase';
-import { doc, setDoc, collection, addDoc, getDocs, updateDoc, deleteDoc, query, where } from 'firebase/firestore';
+import { doc, setDoc, collection, addDoc, getDocs, updateDoc, query, where } from 'firebase/firestore';
+import emailjs from '@emailjs/browser';
 
 interface Prayer {
   id: string;
@@ -128,6 +129,41 @@ export default function Home() {
         }, { merge: true });
         
         console.log('✅ Reminder preferences saved');
+      }
+      
+      // Send immediate email using EmailJS if reminder frequency is set
+      if (form.reminderFrequency !== 'never' && form.email) {
+        try {
+          // EmailJS configuration - you'll need to set these up at emailjs.com
+          const serviceId = process.env.NEXT_PUBLIC_EMAILJS_SERVICE_ID || 'your_service_id';
+          const templateId = process.env.NEXT_PUBLIC_EMAILJS_TEMPLATE_ID || 'your_template_id';
+          const publicKey = process.env.NEXT_PUBLIC_EMAILJS_PUBLIC_KEY || 'your_public_key';
+          
+          const templateParams = {
+            to_email: form.email,
+            from_name: 'Prayer App',
+            to_name: user.displayName || user.email?.split('@')[0] || 'Prayer User',
+            subject: `New ${form.type} added - ${form.reminderFrequency} reminders enabled`,
+            message: `Date: ${form.date}\n\n${form.text}\n\nJournal: ${form.journal || 'None'}${form.prayFor ? `\n\nPraying for: ${form.prayFor}` : ''}`,
+            prayer_type: form.type,
+            prayer_date: form.date,
+            prayer_text: form.text,
+            prayer_journal: form.journal || 'None',
+            praying_for: form.prayFor || 'Not specified',
+            reminder_frequency: form.reminderFrequency,
+          };
+
+          // Only send if EmailJS is properly configured
+          if (serviceId !== 'your_service_id' && templateId !== 'your_template_id' && publicKey !== 'your_public_key') {
+            await emailjs.send(serviceId, templateId, templateParams, publicKey);
+            console.log('✅ Email sent via EmailJS');
+          } else {
+            console.log('ℹ️ EmailJS not configured - email sending skipped (this is normal)');
+          }
+        } catch (emailError) {
+          console.error('❌ EmailJS error:', emailError);
+          // Don't fail the prayer submission if email fails
+        }
       }
       
       // Reset form

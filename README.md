@@ -109,6 +109,49 @@ After deploying Firestore rules, you can configure SMTP settings through the adm
 
 **Note:** For Gmail, you'll need to generate an "App Password" in your Google Account settings.
 
+## Email Configuration
+
+### Option 1: EmailJS (Free, Recommended)
+
+EmailJS provides free email sending without server-side SMTP configuration:
+
+1. **Sign up at [emailjs.com](https://www.emailjs.com/)**
+2. **Create an Email Service** (Gmail, Outlook, etc.)
+3. **Create an Email Template** with these variables:
+   ```
+   Subject: New {{prayer_type}} added - {{reminder_frequency}} reminders enabled
+   
+   Hi {{to_name}},
+   
+   A new prayer has been added to your Prayer App:
+   
+   Date: {{prayer_date}}
+   Type: {{prayer_type}}
+   Text: {{prayer_text}}
+   Journal: {{prayer_journal}}
+   Praying for: {{praying_for}}
+   
+   Reminder Frequency: {{reminder_frequency}}
+   
+   Best regards,
+   Prayer App
+   ```
+4. **Get your credentials**:
+   - Service ID
+   - Template ID  
+   - Public Key
+
+5. **Add to `.env.local`**:
+   ```
+   NEXT_PUBLIC_EMAILJS_SERVICE_ID=your_service_id
+   NEXT_PUBLIC_EMAILJS_TEMPLATE_ID=your_template_id
+   NEXT_PUBLIC_EMAILJS_PUBLIC_KEY=your_public_key
+   ```
+
+### Option 2: SMTP (Advanced)
+
+For custom SMTP servers, configure settings in the admin panel after deploying Firestore rules.
+
 ## Getting Started
 
 First, install dependencies:
