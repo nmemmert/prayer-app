@@ -108,3 +108,33 @@ You can check out [the Next.js GitHub repository](https://github.com/vercel/next
 The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
 
 Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+
+## Docker Support
+
+This application is fully containerized and ready for deployment.
+
+### Building Locally
+
+```bash
+# Build the Docker image
+docker build -t prayer-app .
+
+# Run the container
+docker run -p 3000:3000 prayer-app
+```
+
+### Using Docker Compose
+
+```bash
+# Start the application
+docker-compose up -d
+
+# Stop the application
+docker-compose down
+```
+
+### GitHub Container Registry
+
+The application includes GitHub Actions CI/CD that automatically builds and pushes Docker images to GitHub Container Registry on every push to the main branch.
+
+Images are available at: `ghcr.io/[your-username]/prayer-app:latest`
