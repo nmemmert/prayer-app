@@ -33,8 +33,12 @@ service cloud.firestore {
     match /sharedPrayers/{prayerId} {
       allow read: if true; // Anyone can read shared prayers
       allow create: if request.auth != null; // Only authenticated users can share
-      allow write: if request.auth != null && 
+      allow update: if request.auth != null && 
         request.auth.uid == resource.data.userId; // Only the original sharer can update
+      allow delete: if request.auth != null && 
+        exists(/databases/$(database)/documents/config/admin) &&
+        request.auth.token.email in 
+        get(/databases/$(database)/documents/config/admin).data.adminEmails; // Only admins can delete
     }
   }
 }

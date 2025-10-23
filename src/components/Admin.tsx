@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { doc, getDoc, setDoc, collection, getDocs } from 'firebase/firestore';
+import { doc, getDoc, setDoc, collection, getDocs, deleteDoc } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { useAuth } from '@/context/AuthContext';
 
@@ -165,6 +165,32 @@ export default function Admin() {
     } catch (error) {
       console.error('Error removing admin email:', error);
       setMessage('Error removing admin email.');
+    }
+  };
+
+  const clearCommunityPrayers = async () => {
+    if (!confirm('Are you sure you want to delete ALL community prayers? This action cannot be undone.')) {
+      return;
+    }
+
+    setSaving(true);
+    setMessage('');
+    try {
+      const sharedRef = collection(db, 'sharedPrayers');
+      const querySnapshot = await getDocs(sharedRef);
+      
+      const deletePromises = querySnapshot.docs.map(doc => deleteDoc(doc.ref));
+      await Promise.all(deletePromises);
+      
+      // Reload metrics to update the count
+      await loadConfig();
+      
+      setMessage(`Successfully deleted ${querySnapshot.docs.length} community prayers.`);
+    } catch (error) {
+      console.error('Error clearing community prayers:', error);
+      setMessage('Error clearing community prayers.');
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -371,6 +397,24 @@ export default function Admin() {
               Add Admin
             </button>
           </div>
+        </div>
+      </div>
+
+      <div className="space-y-4">
+        <h3 className="text-xl font-semibold text-white mb-4">Community Management</h3>
+        
+        <div className="bg-gray-800 p-4 rounded-lg">
+          <h4 className="text-lg font-medium text-white mb-2">Clear Community Prayers</h4>
+          <p className="text-gray-300 mb-4">
+            Remove all prayers that have been shared to the community. This action cannot be undone.
+          </p>
+          <button
+            onClick={clearCommunityPrayers}
+            disabled={saving}
+            className="px-4 py-2 bg-red-600 hover:bg-red-700 disabled:bg-red-800 disabled:cursor-not-allowed rounded text-white font-medium transition-colors duration-200"
+          >
+            {saving ? 'Clearing...' : 'Clear All Community Prayers'}
+          </button>
         </div>
       </div>
     </div>
