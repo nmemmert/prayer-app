@@ -20,6 +20,7 @@ const eslintConfig = defineConfig([
     "jest.setup.js",
     "next-i18next.config.js",
     "next.config.ts",
+    "src/dataconnect-generated/**",
   ]),
 ]);
 

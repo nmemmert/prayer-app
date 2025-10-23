@@ -4,7 +4,6 @@ import { createContext, useContext, useEffect, useState, ReactNode } from 'react
 import { User, signInWithEmailAndPassword, signOut, onAuthStateChanged, createUserWithEmailAndPassword } from 'firebase/auth';
 import { auth, db, app } from '@/lib/firebase';
 import { doc, setDoc } from 'firebase/firestore';
-import { getToken, onMessage } from 'firebase/messaging';
 
 interface AuthContextType {
   user: User | null;
@@ -25,7 +24,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     // Register service worker for FCM
     if ('serviceWorker' in navigator) {
       navigator.serviceWorker.register('/firebase-messaging-sw.js')
-        .then((registration) => {
+        .then(() => {
           console.log('Service Worker registered for FCM');
         })
         .catch((error) => {

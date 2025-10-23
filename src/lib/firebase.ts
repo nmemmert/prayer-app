@@ -31,6 +31,7 @@ export const db = getFirestore(app);
 export const storage = getStorage(app);
 
 // Initialize Firebase Analytics and get a reference to the service
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 let analytics: any = null;
 if (typeof window !== 'undefined') {
   import('firebase/analytics').then(({ getAnalytics, isSupported }) => {

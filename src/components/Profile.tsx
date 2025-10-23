@@ -1,11 +1,12 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '@/context/AuthContext';
 import { storage, db } from '@/lib/firebase';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { doc, getDoc, updateDoc } from 'firebase/firestore';
 import { useTheme } from 'next-themes';
+import Image from 'next/image';
 
 interface UserProfile {
   avatarUrl?: string;
@@ -20,13 +21,7 @@ export default function Profile() {
   const [uploading, setUploading] = useState(false);
   const [newCategory, setNewCategory] = useState('');
 
-  useEffect(() => {
-    if (user) {
-      loadProfile();
-    }
-  }, [user]);
-
-  const loadProfile = async () => {
+  const loadProfile = useCallback(async () => {
     if (!user) return;
     try {
       const docRef = doc(db, 'users', user.uid);
@@ -37,7 +32,13 @@ export default function Profile() {
     } catch (error) {
       console.error('Error loading profile:', error);
     }
-  };
+  }, [user]);
+
+  useEffect(() => {
+    if (user) {
+      loadProfile();
+    }
+  }, [user, loadProfile]);
 
   const handleAvatarUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -88,7 +89,7 @@ export default function Profile() {
       <div className="mb-6">
         <label className="block mb-2 text-lg">Avatar</label>
         {profile.avatarUrl && (
-          <img src={profile.avatarUrl} alt="Avatar" className="w-20 h-20 rounded-full mb-2" />
+          <Image src={profile.avatarUrl} alt="Avatar" width={80} height={80} className="w-20 h-20 rounded-full mb-2" />
         )}
         <input
           type="file"
