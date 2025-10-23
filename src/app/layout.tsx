@@ -18,6 +18,10 @@ export const metadata: Metadata = {
   title: "Prayer App",
   description: "A personal prayer and praise journaling app",
   manifest: "/manifest.json",
+  icons: {
+    icon: "/icon-192x192.png",
+    apple: "/icon-192x192.png",
+  },
 };
 
 export default function RootLayout({
