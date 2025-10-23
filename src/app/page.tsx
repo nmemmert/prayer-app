@@ -46,6 +46,7 @@ export default function Home() {
   const itemsPerPage = 10;
   const { user, loading, logout, isAdmin } = useAuth();
   const [showLoadingScreen, setShowLoadingScreen] = useState(true);
+  const [editingPrayer, setEditingPrayer] = useState<Prayer | null>(null);
 
   // Ensure loading screen shows for at least 5 seconds
   useEffect(() => {
@@ -187,7 +188,7 @@ export default function Home() {
     }
     
     try {
-      const newPrayerData = {
+      const prayerData = {
         userId: user.uid,
         date: form.date,
         type: form.type,
@@ -197,63 +198,76 @@ export default function Home() {
         prayFor: form.prayFor,
         reminderFrequency: form.reminderFrequency,
         includeActiveSummary: form.includeActiveSummary,
-        archived: false,
+        archived: editingPrayer ? editingPrayer.archived : false,
       };
       
-      // Save to Firestore
-      const docRef = await addDoc(collection(db, 'prayers'), newPrayerData);
-      
-      // Add to local state with Firestore ID
-      const newPrayer: Prayer = {
-        id: docRef.id,
-        ...newPrayerData,
-      };
-      setPrayers(prev => [...prev, newPrayer]);
-      
-      // Store user reminder preferences in Firestore
-      if (form.reminderFrequency !== 'never') {
-        await setDoc(doc(db, 'users', user.uid), {
-          email: form.email,
-          reminderFrequency: form.reminderFrequency,
-          includeActiveSummary: form.includeActiveSummary,
-          lastEmailSent: null,
-        }, { merge: true });
+      if (editingPrayer) {
+        // Update existing prayer
+        await updateDoc(doc(db, 'prayers', editingPrayer.id), prayerData);
         
-        console.log('✅ Reminder preferences saved');
-      }
-      
-      // Send immediate email using EmailJS if reminder frequency is set
-      if (form.reminderFrequency !== 'never' && form.email) {
-        try {
-          // EmailJS configuration - you'll need to set these up at emailjs.com
-          const serviceId = process.env.NEXT_PUBLIC_EMAILJS_SERVICE_ID || 'your_service_id';
-          const templateId = process.env.NEXT_PUBLIC_EMAILJS_TEMPLATE_ID || 'your_template_id';
-          const publicKey = process.env.NEXT_PUBLIC_EMAILJS_PUBLIC_KEY || 'your_public_key';
+        // Update local state
+        setPrayers(prev => prev.map(p => 
+          p.id === editingPrayer.id ? { ...p, ...prayerData } : p
+        ));
+        
+        // Reset editing state
+        setEditingPrayer(null);
+      } else {
+        // Add new prayer
+        const docRef = await addDoc(collection(db, 'prayers'), prayerData);
+        
+        // Add to local state with Firestore ID
+        const newPrayer: Prayer = {
+          id: docRef.id,
+          ...prayerData,
+        };
+        setPrayers(prev => [...prev, newPrayer]);
+        
+        // Store user reminder preferences in Firestore
+        if (form.reminderFrequency !== 'never') {
+          await setDoc(doc(db, 'users', user.uid), {
+            email: form.email,
+            reminderFrequency: form.reminderFrequency,
+            includeActiveSummary: form.includeActiveSummary,
+            lastEmailSent: null,
+          }, { merge: true });
           
-          const templateParams = {
-            to_email: form.email,
-            from_name: 'Prayer App',
-            to_name: user.displayName || user.email?.split('@')[0] || 'Prayer User',
-            subject: `New ${form.type} added - ${form.reminderFrequency} reminders enabled`,
-            message: `Date: ${form.date}\n\n${form.text}\n\nJournal: ${form.journal || 'None'}${form.prayFor ? `\n\nPraying for: ${form.prayFor}` : ''}`,
-            prayer_type: form.type,
-            prayer_date: form.date,
-            prayer_text: form.text,
-            prayer_journal: form.journal || 'None',
-            praying_for: form.prayFor || 'Not specified',
-            reminder_frequency: form.reminderFrequency,
-          };
+          console.log('✅ Reminder preferences saved');
+        }
+        
+        // Send immediate email using EmailJS if reminder frequency is set
+        if (form.reminderFrequency !== 'never' && form.email) {
+          try {
+            // EmailJS configuration - you'll need to set these up at emailjs.com
+            const serviceId = process.env.NEXT_PUBLIC_EMAILJS_SERVICE_ID || 'your_service_id';
+            const templateId = process.env.NEXT_PUBLIC_EMAILJS_TEMPLATE_ID || 'your_template_id';
+            const publicKey = process.env.NEXT_PUBLIC_EMAILJS_PUBLIC_KEY || 'your_public_key';
+            
+            const templateParams = {
+              to_email: form.email,
+              from_name: 'Prayer App',
+              to_name: user.displayName || user.email?.split('@')[0] || 'Prayer User',
+              subject: `New ${form.type} added - ${form.reminderFrequency} reminders enabled`,
+              message: `Date: ${form.date}\n\n${form.text}\n\nJournal: ${form.journal || 'None'}${form.prayFor ? `\n\nPraying for: ${form.prayFor}` : ''}`,
+              prayer_type: form.type,
+              prayer_date: form.date,
+              prayer_text: form.text,
+              prayer_journal: form.journal || 'None',
+              praying_for: form.prayFor || 'Not specified',
+              reminder_frequency: form.reminderFrequency,
+            };
 
-          // Only send if EmailJS is properly configured
-          if (serviceId !== 'your_service_id' && templateId !== 'your_template_id' && publicKey !== 'your_public_key') {
-            await emailjs.send(serviceId, templateId, templateParams, publicKey);
-            console.log('✅ Email sent via EmailJS');
-          } else {
-            console.log('ℹ️ EmailJS not configured - email sending skipped (this is normal)');
+            // Only send if EmailJS is properly configured
+            if (serviceId !== 'your_service_id' && templateId !== 'your_template_id' && publicKey !== 'your_public_key') {
+              await emailjs.send(serviceId, templateId, templateParams, publicKey);
+              console.log('✅ Email sent via EmailJS');
+            } else {
+              console.log('ℹ️ EmailJS not configured - email sending skipped (this is normal)');
+            }
+          } catch (emailError) {
+            console.error('❌ EmailJS error:', emailError);
+            // Don't fail the prayer submission if email fails
           }
-        } catch (emailError) {
-          console.error('❌ EmailJS error:', emailError);
-          // Don't fail the prayer submission if email fails
         }
       }
       
@@ -408,6 +422,37 @@ export default function Home() {
     }
   };
 
+  // Start editing a prayer
+  const startEditing = (prayer: Prayer) => {
+    setEditingPrayer(prayer);
+    setForm({
+      date: prayer.date,
+      type: prayer.type,
+      text: prayer.text,
+      journal: prayer.journal || '',
+      email: prayer.email,
+      prayFor: prayer.prayFor || '',
+      reminderFrequency: prayer.reminderFrequency || 'never',
+      includeActiveSummary: prayer.includeActiveSummary || false,
+    });
+    setActiveTab('add'); // Switch to add tab to show form
+  };
+
+  // Cancel editing
+  const cancelEditing = () => {
+    setEditingPrayer(null);
+    setForm({
+      date: new Date().toISOString().split('T')[0],
+      type: 'prayer',
+      text: '',
+      journal: '',
+      email: user?.email || '',
+      prayFor: '',
+      reminderFrequency: 'never',
+      includeActiveSummary: false,
+    });
+  };
+
   if (loading || showLoadingScreen) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-gray-900 via-black to-gray-800 flex items-center justify-center p-4">
@@ -469,7 +514,8 @@ export default function Home() {
         <div>
           <h1 className="text-3xl font-bold">Prayer App</h1>
           <p className="text-gray-400 text-sm mt-1">
-            {activeTab === 'add' ? 'Add New Prayer or Praise' : 
+            {editingPrayer ? 'Edit Prayer or Praise' : 
+             activeTab === 'add' ? 'Add New Prayer or Praise' : 
              activeTab === 'search' ? 'Search Results' : 
              `${activeTab.charAt(0).toUpperCase() + activeTab.slice(1)} Prayers`}
           </p>
@@ -623,8 +669,17 @@ export default function Home() {
           </div>
           
           <button type="submit" className="w-full p-4 bg-blue-600 hover:bg-blue-700 rounded text-lg font-semibold mt-6">
-            Add Entry
+            {editingPrayer ? 'Update Entry' : 'Add Entry'}
           </button>
+          {editingPrayer && (
+            <button 
+              type="button" 
+              onClick={cancelEditing}
+              className="w-full p-4 bg-gray-600 hover:bg-gray-700 rounded text-lg font-semibold mt-2"
+            >
+              Cancel Editing
+            </button>
+          )}
         </form>
       )}
 
@@ -680,6 +735,13 @@ export default function Home() {
                         title="Share to community"
                       >
                         🌍 Community
+                      </button>
+                      <button
+                        onClick={() => startEditing(prayer)}
+                        className="px-3 py-2 bg-yellow-600 hover:bg-yellow-700 text-white text-sm font-medium rounded-lg flex items-center gap-2 transition-all duration-200 shadow-md hover:shadow-lg"
+                        title="Edit this prayer"
+                      >
+                        ✏️ Edit
                       </button>
                     </div>
                   </div>
