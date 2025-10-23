@@ -26,6 +26,11 @@ A Progressive Web App (PWA) for journaling prayers and praises, organized by dat
 - Engaging loading screen with animations and inspirational content (minimum 5-second display)
 - Enhanced bottom navigation with gradients, shadows, and improved touch targets
 
+## API Endpoints
+
+- `GET/POST /api/send-email` - Send a single email reminder
+- `GET/POST /api/send-scheduled-emails` - Send scheduled email reminders to all users
+
 ## Setup
 
 1. Create a Firebase project at https://console.firebase.google.com/
@@ -108,6 +113,53 @@ After deploying Firestore rules, you can configure SMTP settings through the adm
 - Use SSL/TLS: Checked for port 465, unchecked for port 587
 
 **Note:** For Gmail, you'll need to generate an "App Password" in your Google Account settings.
+
+## Troubleshooting
+
+### Common Issues
+
+1. **Firebase Configuration**: Ensure all Firebase config values are correctly set in `src/lib/firebase.ts`.
+
+2. **SMTP Settings**: Verify SMTP credentials in the Admin panel. Use app passwords for Gmail.
+
+3. **PWA Installation**: Clear browser cache if PWA doesn't install properly.
+
+4. **Email Reminders**: Check Firestore security rules and ensure SMTP is configured.
+
+### Development
+
+- Run `npm run dev` for development server
+- Run `npm run build` for production build
+- Run `npm run lint` for code linting
+- Run `npm test` for running tests
+
+## User Guides
+
+### Adding Prayers
+
+1. Click the "Add" tab
+2. Fill in the date, type (prayer/praise), text, and optional journal
+3. Set reminder frequency
+4. Click "Add Prayer"
+
+### Managing Prayers
+
+- **Active**: View current prayers
+- **Archived**: View archived prayers
+- **Search**: Search by content
+- **Community**: View shared prayers
+
+### Profile Customization
+
+- Click "Profile" to update avatar, theme, and categories
+
+### Admin Features
+
+- Configure SMTP for emails
+- Manage admin users
+- View analytics
+
+## Getting Started
 
 ## Email Configuration
 

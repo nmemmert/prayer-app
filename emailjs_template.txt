@@ -1,0 +1,13 @@
+To: {{to_email}}
+From: {{from_name}}
+Subject: {{subject}}
+
+{{message}}
+
+Prayer Details:
+- Type: {{prayer_type}}
+- Date: {{prayer_date}}
+- Text: {{prayer_text}}
+- Journal: {{prayer_journal}}
+- Praying for: {{praying_for}}
+- Reminder frequency: {{reminder_frequency}}

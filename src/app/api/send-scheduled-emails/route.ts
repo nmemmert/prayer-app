@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { doc, getDoc, collection, getDocs, updateDoc } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
+import { admin } from '@/lib/firebase-admin';
 
 const nodemailer = require('nodemailer');
 
@@ -326,6 +327,22 @@ export async function GET() {
           text: message,
           html: generatePrayerEmailHTML(message, subject),
         });
+
+        // Send push notification if FCM token exists
+        if (userData.fcmToken && admin.apps.length > 0) {
+          try {
+            await admin.messaging().send({
+              token: userData.fcmToken,
+              notification: {
+                title: subject,
+                body: `You have ${userPrayers.length} active prayers to review.`,
+              },
+            });
+            console.log(`✅ Sent push notification to ${userData.email}`);
+          } catch (fcmError) {
+            console.error(`❌ Failed to send FCM to ${userData.email}:`, fcmError);
+          }
+        }
 
         // Update last email sent time
         await updateDoc(doc(db, 'users', userId), {

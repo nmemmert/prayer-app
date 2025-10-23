@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { doc, getDoc, setDoc } from 'firebase/firestore';
+import { doc, getDoc, setDoc, collection, getDocs } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { useAuth } from '@/context/AuthContext';
 
@@ -35,6 +35,11 @@ export default function Admin() {
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState('');
   const [newAdminEmail, setNewAdminEmail] = useState('');
+  const [metrics, setMetrics] = useState({
+    totalUsers: 0,
+    totalPrayers: 0,
+    totalSharedPrayers: 0,
+  });
 
   useEffect(() => {
     loadConfig();
@@ -56,6 +61,18 @@ export default function Admin() {
         // Default admin config
         setAdminConfig({ adminEmails: ['your-admin-email@example.com'] });
       }
+      
+      // Load metrics
+      const usersSnapshot = await getDocs(collection(db, 'users'));
+      const prayersSnapshot = await getDocs(collection(db, 'prayers'));
+      const sharedPrayersSnapshot = await getDocs(collection(db, 'sharedPrayers'));
+      
+      setMetrics({
+        totalUsers: usersSnapshot.size,
+        totalPrayers: prayersSnapshot.size,
+        totalSharedPrayers: sharedPrayersSnapshot.size,
+      });
+      
     } catch (error) {
       console.error('Error loading config:', error);
     } finally {
@@ -166,6 +183,24 @@ export default function Admin() {
   return (
     <div className="max-w-2xl mx-auto p-6 bg-gray-800 rounded-lg">
       <h2 className="text-2xl font-bold mb-6 text-white">Admin Settings</h2>
+      
+      <div className="mb-6 p-4 bg-gray-700 rounded">
+        <h3 className="text-xl font-semibold text-white mb-4">Analytics Dashboard</h3>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="text-center">
+            <div className="text-2xl font-bold text-blue-400">{metrics.totalUsers}</div>
+            <div className="text-sm text-gray-300">Total Users</div>
+          </div>
+          <div className="text-center">
+            <div className="text-2xl font-bold text-green-400">{metrics.totalPrayers}</div>
+            <div className="text-sm text-gray-300">Total Prayers</div>
+          </div>
+          <div className="text-center">
+            <div className="text-2xl font-bold text-purple-400">{metrics.totalSharedPrayers}</div>
+            <div className="text-sm text-gray-300">Shared Prayers</div>
+          </div>
+        </div>
+      </div>
       
       <div className="space-y-4">
         <h3 className="text-xl font-semibold text-white mb-4">SMTP Configuration</h3>

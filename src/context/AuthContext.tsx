@@ -2,7 +2,9 @@
 
 import { createContext, useContext, useEffect, useState, ReactNode } from 'react';
 import { User, signInWithEmailAndPassword, signOut, onAuthStateChanged, createUserWithEmailAndPassword } from 'firebase/auth';
-import { auth } from '@/lib/firebase';
+import { auth, db, app } from '@/lib/firebase';
+import { doc, setDoc } from 'firebase/firestore';
+import { getToken, onMessage } from 'firebase/messaging';
 
 interface AuthContextType {
   user: User | null;
@@ -20,11 +22,65 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (user) => {
-      setUser(user);
-      setLoading(false);
-    });
-    return unsubscribe;
+    // Register service worker for FCM
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.register('/firebase-messaging-sw.js')
+        .then((registration) => {
+          console.log('Service Worker registered for FCM');
+        })
+        .catch((error) => {
+          console.error('Service Worker registration failed:', error);
+        });
+    }
+
+    const initMessaging = async () => {
+      const { getMessaging, getToken, onMessage } = await import('firebase/messaging');
+      const messaging = getMessaging(app);
+      
+      const unsubscribe = onAuthStateChanged(auth, async (user) => {
+        setUser(user);
+        if (user) {
+          // Request FCM token and save to Firestore
+          try {
+            const token = await getToken(messaging, { vapidKey: 'YOUR_VAPID_KEY' }); // Replace with actual VAPID key
+            if (token) {
+              await setDoc(doc(db, 'users', user.uid), { fcmToken: token }, { merge: true });
+            }
+          } catch (error) {
+            console.error('Error getting FCM token:', error);
+          }
+
+          // Handle foreground messages
+          onMessage(messaging, (payload) => {
+            console.log('Message received. ', payload);
+            // Show notification or alert
+            if (Notification.permission === 'granted') {
+              new Notification(payload.notification?.title || 'Prayer Reminder', {
+                body: payload.notification?.body,
+                icon: '/icon-192x192.png'
+              });
+            }
+          });
+        }
+        setLoading(false);
+      });
+      return unsubscribe;
+    };
+
+    let unsubscribe: (() => void) | undefined;
+    if (typeof window !== 'undefined') {
+      initMessaging().then((unsub) => unsubscribe = unsub);
+    } else {
+      const unsub = onAuthStateChanged(auth, (user) => {
+        setUser(user);
+        setLoading(false);
+      });
+      unsubscribe = unsub;
+    }
+
+    return () => {
+      if (unsubscribe) unsubscribe();
+    };
   }, []);
 
   // Configure admin email addresses here - only these users will have admin access

@@ -4,9 +4,12 @@ import { useState, useEffect } from 'react';
 import { useAuth } from '@/context/AuthContext';
 import Login from '@/components/Login';
 import Admin from '@/components/Admin';
+import Profile from '@/components/Profile';
 import { db } from '@/lib/firebase';
 import { doc, setDoc, collection, addDoc, getDocs, updateDoc, query, where } from 'firebase/firestore';
 import emailjs from '@emailjs/browser';
+import jsPDF from 'jspdf';
+import { CSVLink } from 'react-csv';
 
 interface Prayer {
   id: string;
@@ -24,6 +27,7 @@ interface Prayer {
 
 export default function Home() {
   const [prayers, setPrayers] = useState<Prayer[]>([]);
+  const [sharedPrayers, setSharedPrayers] = useState<Prayer[]>([]);
   const [form, setForm] = useState({
     date: new Date().toISOString().split('T')[0],
     type: 'prayer' as 'prayer' | 'praise',
@@ -35,9 +39,10 @@ export default function Home() {
     includeActiveSummary: false,
   });
   const [showAdmin, setShowAdmin] = useState(false);
+  const [showProfile, setShowProfile] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
-  const [activeTab, setActiveTab] = useState<'add' | 'active' | 'archived' | 'search'>('add');
+  const [activeTab, setActiveTab] = useState<'add' | 'active' | 'archived' | 'search' | 'community'>('add');
   const itemsPerPage = 10;
   const { user, loading, logout, isAdmin } = useAuth();
   const [showLoadingScreen, setShowLoadingScreen] = useState(true);
@@ -71,6 +76,23 @@ export default function Home() {
     }
   };
 
+  // Load shared prayers
+  const loadSharedPrayers = async () => {
+    try {
+      const sharedRef = collection(db, 'sharedPrayers');
+      const querySnapshot = await getDocs(sharedRef);
+      
+      const loadedShared: Prayer[] = [];
+      querySnapshot.forEach((doc) => {
+        loadedShared.push({ id: doc.id, ...doc.data() } as Prayer);
+      });
+      
+      setSharedPrayers(loadedShared);
+    } catch (error) {
+      console.error('Error loading shared prayers:', error);
+    }
+  };
+
   // Load prayers when user changes
   useEffect(() => {
     if (user) {
@@ -80,12 +102,81 @@ export default function Home() {
     }
   }, [user]);
 
+  // Load shared prayers on mount
+  useEffect(() => {
+    loadSharedPrayers();
+  }, []);
+
+  // Export functions
+  const exportToPDF = (prayerList: Prayer[], title: string) => {
+    const doc = new jsPDF();
+    doc.text(title, 10, 10);
+    let y = 20;
+    prayerList.forEach((prayer, index) => {
+      if (y > 270) {
+        doc.addPage();
+        y = 10;
+      }
+      doc.text(`${index + 1}. ${prayer.date} - ${prayer.type.toUpperCase()}: ${prayer.text}`, 10, y);
+      y += 10;
+      if (prayer.prayFor) {
+        doc.text(`Praying for: ${prayer.prayFor}`, 10, y);
+        y += 10;
+      }
+      if (prayer.journal) {
+        doc.text(`Journal: ${prayer.journal}`, 10, y);
+        y += 10;
+      }
+      y += 5;
+    });
+    doc.save(`${title.replace(/\s+/g, '_')}.pdf`);
+  };
+
+  const exportToJSON = (prayerList: Prayer[], title: string) => {
+    const dataStr = JSON.stringify(prayerList, null, 2);
+    const dataUri = 'data:application/json;charset=utf-8,'+ encodeURIComponent(dataStr);
+    const exportFileDefaultName = `${title.replace(/\s+/g, '_')}.json`;
+    const linkElement = document.createElement('a');
+    linkElement.setAttribute('href', dataUri);
+    linkElement.setAttribute('download', exportFileDefaultName);
+    linkElement.click();
+  };
+
+  const getCSVData = (prayerList: Prayer[]) => {
+    return prayerList.map(prayer => ({
+      Date: prayer.date,
+      Type: prayer.type,
+      Text: prayer.text,
+      PrayFor: prayer.prayFor,
+      Journal: prayer.journal,
+      Email: prayer.email,
+      Archived: prayer.archived ? 'Yes' : 'No'
+    }));
+  };
+
   // Auto-populate email field with user's email
   useEffect(() => {
     if (user?.email) {
       setForm(prev => ({ ...prev, email: user.email! }));
     }
   }, [user]);
+
+  // Load draft from localStorage
+  useEffect(() => {
+    const draft = localStorage.getItem('prayerDraft');
+    if (draft) {
+      try {
+        setForm(JSON.parse(draft));
+      } catch (e) {
+        console.error('Error loading draft:', e);
+      }
+    }
+  }, []);
+
+  // Save draft to localStorage
+  useEffect(() => {
+    localStorage.setItem('prayerDraft', JSON.stringify(form));
+  }, [form]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -229,10 +320,12 @@ export default function Home() {
 
   const currentPrayers = activeTab === 'active' ? paginatedActivePrayers : 
                          activeTab === 'archived' ? paginatedArchivedPrayers : 
-                         paginatedSearchPrayers;
+                         activeTab === 'search' ? paginatedSearchPrayers :
+                         sharedPrayers; // Community
   const currentTotalPages = activeTab === 'active' ? totalActivePages : 
                            activeTab === 'archived' ? totalArchivedPages : 
-                           totalSearchPages;
+                           activeTab === 'search' ? totalSearchPages :
+                           1; // Community
 
   const groupedPrayers = currentPrayers.reduce((acc, prayer) => {
     if (!acc[prayer.date]) acc[prayer.date] = [];
@@ -281,6 +374,20 @@ export default function Home() {
       } catch (clipboardErr) {
         alert('Prayer copied to clipboard!');
       }
+    }
+  };
+
+  const shareToCommunity = async (prayer: Prayer) => {
+    try {
+      await addDoc(collection(db, 'sharedPrayers'), {
+        ...prayer,
+        userId: null, // Anonymous
+        sharedAt: new Date(),
+      });
+      loadSharedPrayers(); // Reload
+      alert('Prayer shared to community!');
+    } catch (error) {
+      console.error('Error sharing to community:', error);
     }
   };
 
@@ -368,6 +475,12 @@ export default function Home() {
           </p>
         </div>
         <div className="flex gap-4">
+          <button
+            onClick={() => setShowProfile(!showProfile)}
+            className="px-4 py-3 bg-blue-600 hover:bg-blue-700 rounded text-base font-medium"
+          >
+            {showProfile ? 'Hide Profile' : 'Profile'}
+          </button>
           {isAdmin && (
             <button
               onClick={() => setShowAdmin(!showAdmin)}
@@ -383,6 +496,37 @@ export default function Home() {
       </div>
       
       {showAdmin && <Admin />}
+      {showProfile && <Profile />}
+      
+      {(activeTab === 'active' || activeTab === 'archived') && (
+        <div className="max-w-md mx-auto mb-4 flex flex-wrap gap-2 justify-center">
+          <button
+            onClick={() => {
+              const prayerList = activeTab === 'active' ? prayers.filter(p => !p.archived) : prayers.filter(p => p.archived);
+              exportToPDF(prayerList, `${activeTab} Prayers`);
+            }}
+            className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white text-sm font-medium rounded-lg transition-all duration-200"
+          >
+            Export PDF
+          </button>
+          <CSVLink
+            data={getCSVData(activeTab === 'active' ? prayers.filter(p => !p.archived) : prayers.filter(p => p.archived))}
+            filename={`${activeTab}_prayers.csv`}
+            className="px-4 py-2 bg-green-600 hover:bg-green-700 text-white text-sm font-medium rounded-lg transition-all duration-200 inline-block"
+          >
+            Export CSV
+          </CSVLink>
+          <button
+            onClick={() => {
+              const prayerList = activeTab === 'active' ? prayers.filter(p => !p.archived) : prayers.filter(p => p.archived);
+              exportToJSON(prayerList, `${activeTab} Prayers`);
+            }}
+            className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-lg transition-all duration-200"
+          >
+            Export JSON
+          </button>
+        </div>
+      )}
       
       {activeTab === 'add' && (
         <form onSubmit={handleSubmit} className="max-w-md mx-auto mb-8 space-y-6">
@@ -522,13 +666,22 @@ export default function Home() {
                 <div key={prayer.id} className={`bg-gray-800 p-4 rounded mb-4 ${prayer.archived || activeTab === 'search' ? 'opacity-75 border border-gray-600' : ''}`}>
                   <div className="flex justify-between items-start mb-3">
                     <span className="font-medium capitalize text-lg">{prayer.type}</span>
-                    <button
-                      onClick={() => sharePrayer(prayer)}
-                      className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-lg flex items-center gap-2 transition-all duration-200 shadow-md hover:shadow-lg"
-                      title="Share this prayer"
-                    >
-                      📤 Share
-                    </button>
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() => sharePrayer(prayer)}
+                        className="px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-lg flex items-center gap-2 transition-all duration-200 shadow-md hover:shadow-lg"
+                        title="Share this prayer"
+                      >
+                        📤 Share
+                      </button>
+                      <button
+                        onClick={() => shareToCommunity(prayer)}
+                        className="px-3 py-2 bg-green-600 hover:bg-green-700 text-white text-sm font-medium rounded-lg flex items-center gap-2 transition-all duration-200 shadow-md hover:shadow-lg"
+                        title="Share to community"
+                      >
+                        🌍 Community
+                      </button>
+                    </div>
                   </div>
                   <p className="mb-2">{prayer.text}</p>
                   {prayer.journal && (
@@ -596,7 +749,7 @@ export default function Home() {
       
       {/* Bottom Navigation Tabs */}
       <div className="fixed bottom-0 left-0 right-0 bg-gradient-to-t from-gray-900 via-gray-900 to-gray-800 border-t border-gray-700 shadow-2xl">
-        <div className="grid grid-cols-4 px-2 py-2">
+        <div className="grid grid-cols-5 px-2 py-2">
           <button
             onClick={() => {
               setActiveTab('add');
@@ -654,6 +807,21 @@ export default function Home() {
           >
             <span className="text-lg mb-1">🔍</span>
             <span className="text-xs leading-tight">Search</span>
+          </button>
+          <button
+            onClick={() => {
+              setActiveTab('community');
+              setCurrentPage(1);
+              setSearchTerm(''); // Clear search when switching to community
+            }}
+            className={`mx-1 py-3 px-2 rounded-xl text-center transition-all duration-200 text-sm font-semibold flex flex-col items-center justify-center min-h-[60px] ${
+              activeTab === 'community' 
+                ? 'bg-gradient-to-br from-teal-600 to-teal-700 text-white shadow-lg transform scale-105' 
+                : 'text-gray-400 hover:text-white hover:bg-gray-800/50 active:bg-gray-700/50'
+            }`}
+          >
+            <span className="text-lg mb-1">🌍</span>
+            <span className="text-xs leading-tight">Community</span>
           </button>
         </div>
       </div>
