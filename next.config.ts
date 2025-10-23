@@ -1,5 +1,5 @@
 import type { NextConfig } from "next";
-const withPWA = require('next-pwa');
+import withPWA from 'next-pwa';
 
 const nextConfig: NextConfig = {
   output: 'standalone',

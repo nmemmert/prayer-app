@@ -22,14 +22,14 @@ export default function Login() {
       }
       try {
         await signup(email, password);
-      } catch (err: any) {
-        setError(err.message);
+      } catch (err: unknown) {
+        setError(err instanceof Error ? err.message : 'An error occurred');
       }
     } else {
       try {
         await login(email, password);
-      } catch (err: any) {
-        setError(err.message);
+      } catch (err: unknown) {
+        setError(err instanceof Error ? err.message : 'An error occurred');
       }
     }
   };

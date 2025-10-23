@@ -12,6 +12,14 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // Additional ignores for generated/config files:
+    "public/sw.js",
+    "public/workbox-*.js",
+    "public/firebase-messaging-sw.js",
+    "jest.config.js",
+    "jest.setup.js",
+    "next-i18next.config.js",
+    "next.config.ts",
   ]),
 ]);
 

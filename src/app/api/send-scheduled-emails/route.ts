@@ -2,14 +2,13 @@ import { NextRequest, NextResponse } from 'next/server';
 import { doc, getDoc, collection, getDocs, updateDoc } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { admin } from '@/lib/firebase-admin';
-
-const nodemailer = require('nodemailer');
+import nodemailer from 'nodemailer';
 
 function generatePrayerEmailHTML(message: string, subject: string) {
   // Parse the message to extract prayer details
   const lines = message.split('\n');
   let currentPrayer = null;
-  let prayers = [];
+  const prayers = [];
   let summarySection = false;
 
   for (const line of lines) {

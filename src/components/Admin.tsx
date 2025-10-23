@@ -108,14 +108,15 @@ export default function Admin() {
     try {
       await setDoc(doc(db, 'config', 'smtp'), config);
       setMessage('SMTP configuration saved successfully!');
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Error saving config:', error);
-      if (error.code === 'permission-denied') {
+      const err = error as { code?: string; message?: string };
+      if (err.code === 'permission-denied') {
         setMessage('Permission denied. Please check your authentication and Firestore security rules.');
-      } else if (error.code === 'unavailable') {
+      } else if (err.code === 'unavailable') {
         setMessage('Firestore is currently unavailable. Please try again later.');
       } else {
-        setMessage(`Error saving configuration: ${error.message || 'Unknown error'}`);
+        setMessage(`Error saving configuration: ${err.message || 'Unknown error'}`);
       }
     } finally {
       setSaving(false);
@@ -171,7 +172,7 @@ export default function Admin() {
     return (
       <div className="max-w-2xl mx-auto p-6 bg-red-900 border border-red-700 rounded-lg">
         <h2 className="text-xl font-bold text-red-100 mb-2">Access Denied</h2>
-        <p className="text-red-200">You don't have permission to access the admin panel.</p>
+        <p className="text-red-200">You don&apos;t have permission to access the admin panel.</p>
       </div>
     );
   }
